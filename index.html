@@ -91,14 +91,7 @@
   .admin-btn-top:hover { background: var(--purple-pale); border-color: var(--purple-mid); }
 
   /* ===== DIRECTIONS BOX ===== */
-  .directions-box {
-    background: var(--white);
-    border-right: 4px solid var(--purple-main);
-    margin: 14px 16px;
-    border-radius: 10px;
-    padding: 14px 16px;
-    box-shadow: 0 2px 10px rgba(91,45,156,0.1);
-  }
+  .directions-box { display: none; }
   .directions-title {
     font-size: 0.85rem;
     font-weight: 700;
@@ -453,7 +446,7 @@
 
   /* view table link */
   .view-table-bar {
-    margin: 0 14px 16px;
+    margin: 18px 14px 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -714,7 +707,7 @@
       </div>
       <div class="setting-row">
         <label class="setting-label">מיקום הפגישה</label>
-        <input type="text" class="setting-input" id="adminLocation" value="חדר אנגלית">
+        <input type="text" class="setting-input" id="adminLocation" value="בית הספר – חדר 12">
       </div>
       <div class="setting-row">
         <label class="setting-label">כותרת הוראות הגעה</label>
@@ -739,20 +732,23 @@
 <script>
 // ===== DATA STORE (localStorage as DB) =====
 const DB_KEY = 'yomHorim_v3';
-const SETTINGS_KEY = 'yomHorimSettings_v4';
+const SETTINGS_KEY = 'yomHorimSettings_v5';
 const ADMIN_CODE = '3699';
 
-function loadData() {
-  try { return JSON.parse(localStorage.getItem(DB_KEY) || '{}'); } catch { return {}; }
+async function loadData() {
+  try {
+    const res = await window.storage.get(DB_KEY, true);
+    return res ? JSON.parse(res.value) : {};
+  } catch { return {}; }
 }
-function saveData(data) {
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
+async function saveData(data) {
+  try { await window.storage.set(DB_KEY, JSON.stringify(data), true); } catch(e) { console.error(e); }
 }
 const DEFAULT_SETTINGS = {
   teacherTitle: 'יום הורים עם המורה לאנגלית חזי כהן גלמן',
   dateDisplay: 'יום ראשון, 24.5.2026',
-  location: 'בית הספר – חדר 12',
-  dirTitle: 'הוראות הגעה',
+  location: 'חדר אנגלית',
+  dirTitle: '',
   dirText: ''
 };
 
@@ -782,8 +778,8 @@ function generateSlots() {
 const ALL_SLOTS = generateSlots();
 let selectedSlot = null;
 
-function renderSlots() {
-  const db = loadData();
+async function renderSlots() {
+  const db = await loadData();
   const grid = document.getElementById('slotsGrid');
   grid.innerHTML = '';
   ALL_SLOTS.forEach(time => {
@@ -815,7 +811,7 @@ function closeBookingModal() {
   selectedSlot = null;
 }
 
-function submitBooking() {
+async function submitBooking() {
   const firstName = document.getElementById('fieldFirstName').value.trim();
   const lastName = document.getElementById('fieldLastName').value.trim();
   const cls = document.getElementById('fieldClass').value;
@@ -826,19 +822,19 @@ function submitBooking() {
     return;
   }
 
-  const db = loadData();
+  const db = await loadData();
   if (db[selectedSlot]) { alert('שעה זו כבר תפוסה. בחרו שעה אחרת.'); closeBookingModal(); renderSlots(); return; }
 
-  const settings = loadSettings();
+  const settings = await loadSettings();
   const now = new Date();
   const timestamp = now.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
 
   db[selectedSlot] = { firstName, lastName, class: cls, notes, timestamp };
-  saveData(db);
+  await saveData(db);
 
   closeBookingModal();
   renderSlots();
-  showSuccess({ time: selectedSlot, firstName, lastName, class: cls, notes, location: settings.location || 'בית הספר – חדר 12', date: settings.dateDisplay || '24.5.2026' });
+  showSuccess({ time: selectedSlot, firstName, lastName, class: cls, notes, location: settings.location || '', date: settings.dateDisplay || '' });
 }
 
 // ===== SUCCESS MODAL =====
@@ -923,8 +919,8 @@ function closeAdminMain() {
   document.getElementById('adminMainPanel').classList.remove('active');
 }
 
-function renderAdminBookings() {
-  const db = loadData();
+async function renderAdminBookings() {
+  const db = await loadData();
   const container = document.getElementById('adminBookingsList');
   const entries = Object.entries(db).sort((a, b) => a[0].localeCompare(b[0]));
   if (entries.length === 0) {
